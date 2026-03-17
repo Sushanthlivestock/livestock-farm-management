@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import PDFDocument from 'pdfkit';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // GET - Generate and return PDF report
 export async function GET(request: NextRequest) {
@@ -8,11 +9,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get('type') || 'full';
     
+    console.log('Generating PDF report...');
+    
     // Gather all data for the report
     const animals = await db.animal.findMany({
-      include: {
-        healthRecords: { orderBy: { date: 'desc' }, take: 5 },
-      },
       orderBy: { createdAt: 'desc' },
     });
     
@@ -28,12 +28,6 @@ export async function GET(request: NextRequest) {
         female: { select: { name: true, tagNumber: true } },
       },
       orderBy: { breedingDate: 'desc' },
-      take: 50,
-    });
-    
-    const feedingRecords = await db.feedingRecord.findMany({
-      include: { animal: { select: { name: true, tagNumber: true } } },
-      orderBy: { date: 'desc' },
       take: 50,
     });
     
@@ -55,298 +49,291 @@ export async function GET(request: NextRequest) {
     const totalIncome = income.reduce((sum, i) => sum + i.amount, 0);
     const profit = totalIncome - totalExpenses;
     
+    console.log('Data collected, creating PDF...');
+    
     // Create PDF document
-    const doc = new PDFDocument({ 
-      size: 'A4', 
-      margin: 50,
-      bufferPages: true 
-    });
+    const doc = new jsPDF();
+    let yPos = 20;
     
-    // Collect PDF data in buffer
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    // Title
+    doc.setFillColor(5, 150, 105);
+    doc.rect(0, 0, 220, 40, 'F');
     
-    // Helper function to add text with color
-    const addColoredText = (text: string, x: number, y: number, options: any = {}) => {
-      doc.fontSize(options.size || 12)
-         .fillColor(options.color || '#333333')
-         .text(text, x, y, { width: 500, ...options });
-    };
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Livestock Farm Report', 20, 20);
     
-    // Helper to draw a table row
-    const drawTableRow = (y: number, data: string[], widths: number[], isHeader = false) => {
-      let x = 50;
-      const rowHeight = 25;
-      
-      // Draw row background
-      if (isHeader) {
-        doc.fillColor('#059669').rect(x, y, 495, rowHeight).fill();
-      } else {
-        doc.fillColor('#ffffff').rect(x, y, 495, rowHeight).fill();
-      }
-      
-      // Draw cell borders and text
-      data.forEach((text, i) => {
-        doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(x, y, widths[i], rowHeight).stroke();
-        
-        if (isHeader) {
-          doc.fontSize(10).fillColor('#ffffff').font('Helvetica-Bold');
-        } else {
-          doc.fontSize(9).fillColor('#374151').font('Helvetica');
-        }
-        
-        doc.text(text, x + 5, y + 7, { width: widths[i] - 10, ellipsis: true });
-        x += widths[i];
-      });
-      
-      return y + rowHeight;
-    };
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Complete Farm Management Report', 20, 30);
     
-    // Title Page
-    doc.fillColor('#059669').rect(0, 0, 595, 150).fill();
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 38);
     
-    doc.fontSize(28).fillColor('#ffffff').font('Helvetica-Bold')
-       .text('Livestock Farm Report', 50, 50);
+    yPos = 55;
     
-    doc.fontSize(14).fillColor('#d1fae5').font('Helvetica')
-       .text('Complete Farm Management Report', 50, 90);
+    // Farm Overview Section
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Farm Overview', 20, yPos);
     
-    doc.fontSize(11).fillColor('#d1fae5')
-       .text(`Generated: ${new Date().toLocaleString()}`, 50, 115);
-    
-    // Statistics Section
-    let y = 180;
-    
-    doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold')
-       .text('Farm Overview', 50, y);
-    
-    y += 35;
+    yPos += 10;
     
     // Stats boxes
-    const stats = [
-      { label: 'Total Animals', value: totalAnimals.toString(), color: '#059669' },
-      { label: 'Goats', value: totalGoats.toString(), color: '#10b981' },
-      { label: 'Pigs', value: totalPigs.toString(), color: '#f59e0b' },
-      { label: 'Avg Weight', value: `${avgWeight.toFixed(1)} kg`, color: '#6366f1' },
-    ];
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(15, yPos, 45, 25, 3, 3, 'F');
+    doc.roundedRect(65, yPos, 45, 25, 3, 3, 'F');
+    doc.roundedRect(115, yPos, 45, 25, 3, 3, 'F');
+    doc.roundedRect(165, yPos, 45, 25, 3, 3, 'F');
     
-    stats.forEach((stat, i) => {
-      const x = 50 + (i * 125);
-      doc.fillColor('#f9fafb').roundedRect(x, y, 115, 60, 8).fill();
-      doc.fillColor(stat.color).fontSize(22).font('Helvetica-Bold').text(stat.value, x + 10, y + 10);
-      doc.fillColor('#6b7280').fontSize(10).font('Helvetica').text(stat.label, x + 10, y + 40);
-    });
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(String(totalAnimals), 25, yPos + 10);
+    doc.text(String(totalGoats), 75, yPos + 10);
+    doc.text(String(totalPigs), 125, yPos + 10);
+    doc.text(avgWeight.toFixed(1), 175, yPos + 10);
     
-    y += 90;
+    doc.setTextColor(107, 114, 128);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Total Animals', 25, yPos + 18);
+    doc.text('Goats', 75, yPos + 18);
+    doc.text('Pigs', 125, yPos + 18);
+    doc.text('Avg Weight (kg)', 175, yPos + 18);
+    
+    yPos += 35;
     
     // Health Status
-    doc.fontSize(14).fillColor('#059669').font('Helvetica-Bold').text('Health Status', 50, y);
-    y += 25;
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Health Status', 20, yPos);
     
-    doc.fillColor('#d1fae5').rect(50, y, 150, 30).fill();
-    doc.fillColor('#059669').fontSize(11).text(`Healthy: ${healthyCount}`, 60, y + 10);
+    yPos += 8;
     
-    doc.fillColor('#fee2e2').rect(210, y, 150, 30).fill();
-    doc.fillColor('#dc2626').fontSize(11).text(`Sick: ${sickCount}`, 220, y + 10);
+    doc.setFillColor(209, 250, 229);
+    doc.roundedRect(15, yPos, 60, 12, 2, 2, 'F');
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(10);
+    doc.text(`Healthy: ${healthyCount}`, 20, yPos + 8);
     
-    doc.fillColor('#fef3c7').rect(370, y, 150, 30).fill();
-    doc.fillColor('#d97706').fontSize(11).text(`Pregnant: ${pregnantCount}`, 380, y + 10);
+    doc.setFillColor(254, 226, 226);
+    doc.roundedRect(80, yPos, 60, 12, 2, 2, 'F');
+    doc.setTextColor(220, 38, 38);
+    doc.text(`Sick: ${sickCount}`, 85, yPos + 8);
     
-    y += 50;
+    doc.setFillColor(254, 243, 199);
+    doc.roundedRect(145, yPos, 60, 12, 2, 2, 'F');
+    doc.setTextColor(217, 119, 6);
+    doc.text(`Pregnant: ${pregnantCount}`, 150, yPos + 8);
+    
+    yPos += 22;
     
     // Financial Summary
-    doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold').text('Financial Summary', 50, y);
-    y += 35;
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Financial Summary', 20, yPos);
     
-    doc.fillColor('#ffffff').rect(50, y, 495, 80).fill();
-    doc.strokeColor('#e5e7eb').lineWidth(1).rect(50, y, 495, 80).stroke();
+    yPos += 8;
     
-    doc.fontSize(12).fillColor('#6b7280').font('Helvetica').text('Total Expenses:', 70, y + 20);
-    doc.fontSize(14).fillColor('#dc2626').font('Helvetica-Bold').text(`Rs. ${totalExpenses.toLocaleString()}`, 200, y + 20);
-    
-    doc.fontSize(12).fillColor('#6b7280').font('Helvetica').text('Total Income:', 70, y + 45);
-    doc.fontSize(14).fillColor('#059669').font('Helvetica-Bold').text(`Rs. ${totalIncome.toLocaleString()}`, 200, y + 45);
-    
-    const profitColor = profit >= 0 ? '#059669' : '#dc2626';
-    doc.fontSize(12).fillColor('#6b7280').font('Helvetica').text('Net Profit/Loss:', 320, y + 20);
-    doc.fontSize(16).fillColor(profitColor).font('Helvetica-Bold').text(`Rs. ${Math.abs(profit).toLocaleString()}`, 420, y + 20);
-    doc.fontSize(11).fillColor(profitColor).text(profit >= 0 ? '(Profit)' : '(Loss)', 420, y + 42);
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Category', 'Amount']],
+      body: [
+        ['Total Expenses', `Rs. ${totalExpenses.toLocaleString()}`],
+        ['Total Income', `Rs. ${totalIncome.toLocaleString()}`],
+        ['Net Profit/Loss', `Rs. ${Math.abs(profit).toLocaleString()} (${profit >= 0 ? 'Profit' : 'Loss'})`],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [5, 150, 105], fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { cellWidth: 80, halign: 'right' },
+      },
+      margin: { left: 15 },
+    });
     
     // Animals Table
     if (animals.length > 0) {
       doc.addPage();
-      y = 50;
+      yPos = 20;
       
-      doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold').text('Animals List', 50, y);
-      y += 30;
+      doc.setTextColor(5, 150, 105);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Animals List', 20, yPos);
       
-      const widths = [70, 80, 50, 100, 60, 60, 75];
-      const headers = ['Tag #', 'Name', 'Type', 'Breed', 'Gender', 'Weight', 'Status'];
+      yPos += 5;
       
-      y = drawTableRow(y, headers, widths, true);
+      const animalData = animals.map(a => [
+        a.tagNumber,
+        a.name || '-',
+        a.type.charAt(0).toUpperCase() + a.type.slice(1),
+        a.breed,
+        a.gender.charAt(0).toUpperCase() + a.gender.slice(1),
+        `${a.weight} kg`,
+        a.status.charAt(0).toUpperCase() + a.status.slice(1),
+      ]);
       
-      animals.slice(0, 25).forEach((animal) => {
-        if (y > 750) {
-          doc.addPage();
-          y = 50;
-          y = drawTableRow(y, headers, widths, true);
-        }
-        
-        const status = animal.status.charAt(0).toUpperCase() + animal.status.slice(1);
-        y = drawTableRow(y, [
-          animal.tagNumber,
-          animal.name || '-',
-          animal.type.charAt(0).toUpperCase() + animal.type.slice(1),
-          animal.breed,
-          animal.gender.charAt(0).toUpperCase() + animal.gender.slice(1),
-          `${animal.weight} kg`,
-          status
-        ], widths);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Tag #', 'Name', 'Type', 'Breed', 'Gender', 'Weight', 'Status']],
+        body: animalData,
+        theme: 'grid',
+        headStyles: { fillColor: [5, 150, 105], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 10, right: 10 },
+        styles: { cellPadding: 2 },
       });
     }
     
     // Health Records
     if (healthRecords.length > 0) {
       doc.addPage();
-      y = 50;
+      yPos = 20;
       
-      doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold').text('Health Records', 50, y);
-      y += 30;
+      doc.setTextColor(5, 150, 105);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Health Records', 20, yPos);
       
-      const widths = [80, 80, 80, 150, 105];
-      const headers = ['Date', 'Animal', 'Type', 'Description', 'Veterinarian'];
+      yPos += 5;
       
-      y = drawTableRow(y, headers, widths, true);
+      const healthData = healthRecords.map(h => [
+        new Date(h.date).toLocaleDateString(),
+        h.animal?.tagNumber || '-',
+        h.type.charAt(0).toUpperCase() + h.type.slice(1),
+        h.description.substring(0, 30),
+        h.veterinarian || '-',
+        h.cost ? `Rs. ${h.cost}` : '-',
+      ]);
       
-      healthRecords.slice(0, 25).forEach((record) => {
-        if (y > 750) {
-          doc.addPage();
-          y = 50;
-          y = drawTableRow(y, headers, widths, true);
-        }
-        
-        y = drawTableRow(y, [
-          new Date(record.date).toLocaleDateString(),
-          record.animal?.tagNumber || '-',
-          record.type.charAt(0).toUpperCase() + record.type.slice(1),
-          record.description.substring(0, 40),
-          record.veterinarian || '-'
-        ], widths);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'Animal', 'Type', 'Description', 'Vet', 'Cost']],
+        body: healthData,
+        theme: 'grid',
+        headStyles: { fillColor: [5, 150, 105], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 10, right: 10 },
+        styles: { cellPadding: 2 },
       });
     }
     
     // Breeding Records
     if (breedingRecords.length > 0) {
       doc.addPage();
-      y = 50;
+      yPos = 20;
       
-      doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold').text('Breeding Records', 50, y);
-      y += 30;
+      doc.setTextColor(5, 150, 105);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Breeding Records', 20, yPos);
       
-      const widths = [90, 90, 90, 90, 75, 60];
-      const headers = ['Date', 'Male', 'Female', 'Expected Birth', 'Status', 'Offspring'];
+      yPos += 5;
       
-      y = drawTableRow(y, headers, widths, true);
+      const breedingData = breedingRecords.map(b => [
+        new Date(b.breedingDate).toLocaleDateString(),
+        b.male?.tagNumber || '-',
+        b.female?.tagNumber || '-',
+        b.expectedBirth ? new Date(b.expectedBirth).toLocaleDateString() : '-',
+        b.status.charAt(0).toUpperCase() + b.status.slice(1),
+        b.offspringCount?.toString() || '-',
+      ]);
       
-      breedingRecords.slice(0, 25).forEach((record) => {
-        if (y > 750) {
-          doc.addPage();
-          y = 50;
-          y = drawTableRow(y, headers, widths, true);
-        }
-        
-        y = drawTableRow(y, [
-          new Date(record.breedingDate).toLocaleDateString(),
-          record.male?.tagNumber || '-',
-          record.female?.tagNumber || '-',
-          record.expectedBirth ? new Date(record.expectedBirth).toLocaleDateString() : '-',
-          record.status.charAt(0).toUpperCase() + record.status.slice(1),
-          record.offspringCount?.toString() || '-'
-        ], widths);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'Male', 'Female', 'Expected Birth', 'Status', 'Offspring']],
+        body: breedingData,
+        theme: 'grid',
+        headStyles: { fillColor: [5, 150, 105], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 10, right: 10 },
+        styles: { cellPadding: 2 },
       });
     }
     
-    // Expenses Table
+    // Expenses
     if (expenses.length > 0) {
       doc.addPage();
-      y = 50;
+      yPos = 20;
       
-      doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold').text('Recent Expenses', 50, y);
-      y += 30;
+      doc.setTextColor(5, 150, 105);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Recent Expenses', 20, yPos);
       
-      const widths = [90, 120, 200, 85];
-      const headers = ['Date', 'Category', 'Description', 'Amount'];
+      yPos += 5;
       
-      y = drawTableRow(y, headers, widths, true);
+      const expenseData = expenses.map(e => [
+        new Date(e.date).toLocaleDateString(),
+        e.category.charAt(0).toUpperCase() + e.category.slice(1),
+        e.description.substring(0, 40),
+        `Rs. ${e.amount.toLocaleString()}`,
+      ]);
       
-      expenses.slice(0, 30).forEach((expense) => {
-        if (y > 750) {
-          doc.addPage();
-          y = 50;
-          y = drawTableRow(y, headers, widths, true);
-        }
-        
-        y = drawTableRow(y, [
-          new Date(expense.date).toLocaleDateString(),
-          expense.category.charAt(0).toUpperCase() + expense.category.slice(1),
-          expense.description.substring(0, 50),
-          `Rs. ${expense.amount.toLocaleString()}`
-        ], widths);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'Category', 'Description', 'Amount']],
+        body: expenseData,
+        theme: 'grid',
+        headStyles: { fillColor: [5, 150, 105], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 10, right: 10 },
+        styles: { cellPadding: 2 },
       });
     }
     
-    // Income Table
+    // Income
     if (income.length > 0) {
       doc.addPage();
-      y = 50;
+      yPos = 20;
       
-      doc.fontSize(18).fillColor('#059669').font('Helvetica-Bold').text('Recent Income', 50, y);
-      y += 30;
+      doc.setTextColor(5, 150, 105);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Recent Income', 20, yPos);
       
-      const widths = [90, 120, 200, 85];
-      const headers = ['Date', 'Category', 'Description', 'Amount'];
+      yPos += 5;
       
-      y = drawTableRow(y, headers, widths, true);
+      const incomeData = income.map(i => [
+        new Date(i.date).toLocaleDateString(),
+        i.category.charAt(0).toUpperCase() + i.category.slice(1),
+        i.description.substring(0, 40),
+        `Rs. ${i.amount.toLocaleString()}`,
+      ]);
       
-      income.slice(0, 30).forEach((inc) => {
-        if (y > 750) {
-          doc.addPage();
-          y = 50;
-          y = drawTableRow(y, headers, widths, true);
-        }
-        
-        y = drawTableRow(y, [
-          new Date(inc.date).toLocaleDateString(),
-          inc.category.charAt(0).toUpperCase() + inc.category.slice(1),
-          inc.description.substring(0, 50),
-          `Rs. ${inc.amount.toLocaleString()}`
-        ], widths);
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Date', 'Category', 'Description', 'Amount']],
+        body: incomeData,
+        theme: 'grid',
+        headStyles: { fillColor: [5, 150, 105], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 10, right: 10 },
+        styles: { cellPadding: 2 },
       });
     }
     
-    // Footer on all pages
-    const pages = doc.bufferedPageRange();
-    for (let i = 0; i < pages.count; i++) {
-      doc.switchToPage(i);
-      
-      // Page number
-      doc.fontSize(9).fillColor('#9ca3af')
-         .text(`Page ${i + 1} of ${pages.count}`, 50, 780, { align: 'center' });
-      
-      // Footer
-      doc.fontSize(8).fillColor('#9ca3af')
-         .text('Generated by Livestock Farm Management System', 50, 790, { align: 'center' });
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setTextColor(156, 163, 175);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} of ${pageCount}`, 105, 290, { align: 'center' });
+      doc.text('Generated by Livestock Farm Management System', 105, 295, { align: 'center' });
     }
     
-    // Finalize PDF
-    doc.end();
+    console.log('PDF created successfully');
     
-    // Wait for PDF to be generated and convert to buffer
-    const pdfBuffer = await new Promise<Buffer>((resolve) => {
-      doc.on('end', () => {
-        resolve(Buffer.concat(chunks));
-      });
-    });
+    // Generate PDF buffer
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
     
     const timestamp = new Date().toISOString().slice(0, 10);
     
@@ -364,7 +351,8 @@ export async function GET(request: NextRequest) {
     console.error('Error generating report:', error);
     return NextResponse.json({ 
       error: 'Failed to generate report',
-      details: error.message 
+      details: error.message,
+      stack: error.stack
     }, { status: 500 });
   }
 }
