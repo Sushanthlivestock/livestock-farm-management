@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          String    @default("user") // admin, user, viewer
+  phone         String?
+  avatar        String?
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Animal {
+  id            String        @id @default(cuid())
+  tagNumber     String        @unique
+  name          String?
+  type          String        // "goat" or "pig"
+  breed         String
+  gender        String        // "male" or "female"
+  birthDate     DateTime
+  weight        Float         // in kg
+  status        String        @default("healthy") // healthy, sick, pregnant, sold, deceased
+  color         String?
+  penNumber     String?
+  notes         String?
+  purchasePrice Float?
+  purchaseDate  DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  healthRecords     HealthRecord[]
+  feedingRecords    FeedingRecord[]
+  maleBreeding      BreedingRecord[]  @relation("MaleBreeding")
+  femaleBreeding    BreedingRecord[]  @relation("FemaleBreeding")
+}
+
+model HealthRecord {
+  id          String   @id @default(cuid())
+  animalId    String
+  animal      Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  date        DateTime @default(now())
+  type        String   // vaccination, treatment, checkup, medication
+  description String
+  veterinarian String?
+  medication   String?
+  dosage       String?
+  nextDueDate  DateTime?
+  cost         Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BreedingRecord {
+  id            String   @id @default(cuid())
+  maleId        String
+  femaleId      String
+  male          Animal   @relation("MaleBreeding", fields: [maleId], references: [id])
+  female        Animal   @relation("FemaleBreeding", fields: [femaleId], references: [id])
+  breedingDate  DateTime
+  expectedBirth DateTime?
+  actualBirth   DateTime?
+  offspringCount Int?
+  status        String   @default("planned") // planned, confirmed, completed, failed
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FeedingRecord {
+  id          String   @id @default(cuid())
+  animalId    String
+  animal      Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  date        DateTime @default(now())
+  feedType    String
+  quantity    Float    // in kg
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   // feed, medication, equipment, labor, utilities, other
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Income {
+  id          String   @id @default(cuid())
+  category    String   // sale, product, other
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
