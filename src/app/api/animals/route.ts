@@ -12,14 +12,14 @@ export async function GET(request: NextRequest) {
 
     const where: any = {};
     
-    if (type) where.type = type;
-    if (status) where.status = status;
-    if (gender) where.gender = gender;
+    if (type && type !== 'all') where.type = type;
+    if (status && status !== 'all') where.status = status;
+    if (gender && gender !== 'all') where.gender = gender;
     if (search) {
       where.OR = [
-        { name: { contains: search } },
-        { tagNumber: { contains: search } },
-        { breed: { contains: search } },
+        { name: { contains: search, mode: 'insensitive' } },
+        { tagNumber: { contains: search, mode: 'insensitive' } },
+        { breed: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -46,27 +46,49 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    console.log('Creating animal with data:', body);
+    
+    // Validate required fields
+    if (!body.tagNumber || !body.type || !body.breed || !body.gender || !body.birthDate || !body.weight) {
+      return NextResponse.json({ 
+        error: 'Missing required fields',
+        required: ['tagNumber', 'type', 'breed', 'gender', 'birthDate', 'weight']
+      }, { status: 400 });
+    }
+    
     const animal = await db.animal.create({
       data: {
         tagNumber: body.tagNumber,
-        name: body.name,
+        name: body.name || null,
         type: body.type,
         breed: body.breed,
         gender: body.gender,
         birthDate: new Date(body.birthDate),
-        weight: parseFloat(body.weight),
+        weight: parseFloat(body.weight) || 0,
         status: body.status || 'healthy',
-        color: body.color,
-        penNumber: body.penNumber,
-        notes: body.notes,
+        color: body.color || null,
+        penNumber: body.penNumber || null,
+        notes: body.notes || null,
         purchasePrice: body.purchasePrice ? parseFloat(body.purchasePrice) : null,
         purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
       },
     });
 
+    console.log('Animal created successfully:', animal);
     return NextResponse.json(animal, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating animal:', error);
-    return NextResponse.json({ error: 'Failed to create animal' }, { status: 500 });
+    
+    // Check for unique constraint violation (duplicate tag number)
+    if (error.code === 'P2002') {
+      return NextResponse.json({ 
+        error: 'Tag number already exists. Please use a unique tag number.' 
+      }, { status: 400 });
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to create animal',
+      details: error.message 
+    }, { status: 500 });
   }
 }
