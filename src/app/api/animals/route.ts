@@ -46,49 +46,79 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    console.log('Creating animal with data:', body);
+    console.log('=== Creating Animal ===');
+    console.log('Received data:', JSON.stringify(body, null, 2));
     
     // Validate required fields
-    if (!body.tagNumber || !body.type || !body.breed || !body.gender || !body.birthDate || !body.weight) {
+    const requiredFields = ['tagNumber', 'type', 'breed', 'gender', 'birthDate', 'weight'];
+    const missingFields = requiredFields.filter(field => !body[field]);
+    
+    if (missingFields.length > 0) {
+      console.log('Missing fields:', missingFields);
       return NextResponse.json({ 
-        error: 'Missing required fields',
-        required: ['tagNumber', 'type', 'breed', 'gender', 'birthDate', 'weight']
+        error: `Missing required fields: ${missingFields.join(', ')}`,
       }, { status: 400 });
     }
     
+    // Prepare data
+    const animalData = {
+      tagNumber: String(body.tagNumber).trim(),
+      name: body.name ? String(body.name).trim() : null,
+      type: String(body.type),
+      breed: String(body.breed),
+      gender: String(body.gender),
+      birthDate: new Date(body.birthDate),
+      weight: parseFloat(body.weight) || 0,
+      status: body.status || 'healthy',
+      color: body.color ? String(body.color).trim() : null,
+      penNumber: body.penNumber ? String(body.penNumber).trim() : null,
+      notes: body.notes ? String(body.notes).trim() : null,
+      purchasePrice: body.purchasePrice ? parseFloat(body.purchasePrice) : null,
+      purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
+    };
+    
+    console.log('Prepared data for database:', JSON.stringify(animalData, null, 2));
+    
     const animal = await db.animal.create({
-      data: {
-        tagNumber: body.tagNumber,
-        name: body.name || null,
-        type: body.type,
-        breed: body.breed,
-        gender: body.gender,
-        birthDate: new Date(body.birthDate),
-        weight: parseFloat(body.weight) || 0,
-        status: body.status || 'healthy',
-        color: body.color || null,
-        penNumber: body.penNumber || null,
-        notes: body.notes || null,
-        purchasePrice: body.purchasePrice ? parseFloat(body.purchasePrice) : null,
-        purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
-      },
+      data: animalData,
     });
 
-    console.log('Animal created successfully:', animal);
+    console.log('Animal created successfully:', animal.id);
     return NextResponse.json(animal, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating animal:', error);
     
-    // Check for unique constraint violation (duplicate tag number)
+  } catch (error: any) {
+    console.error('=== Error Creating Animal ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Full error:', error);
+    
+    // Check for specific error types
     if (error.code === 'P2002') {
       return NextResponse.json({ 
-        error: 'Tag number already exists. Please use a unique tag number.' 
+        error: 'Tag number already exists. Please use a unique tag number.',
+        code: 'DUPLICATE_TAG'
       }, { status: 400 });
+    }
+    
+    if (error.code === 'P2021') {
+      return NextResponse.json({ 
+        error: 'Database table not found. Please run database migration.',
+        code: 'TABLE_NOT_FOUND'
+      }, { status: 500 });
+    }
+    
+    if (error.code === 'P1001') {
+      return NextResponse.json({ 
+        error: 'Cannot connect to database. Please check DATABASE_URL.',
+        code: 'DB_CONNECTION_ERROR'
+      }, { status: 500 });
     }
     
     return NextResponse.json({ 
       error: 'Failed to create animal',
-      details: error.message 
+      details: error.message,
+      code: error.code || 'UNKNOWN'
     }, { status: 500 });
   }
 }

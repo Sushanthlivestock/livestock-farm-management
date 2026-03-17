@@ -463,20 +463,32 @@ export default function LivestockFarmManagement() {
   // CRUD Operations
   const createAnimal = async () => {
     try {
+      // Validate required fields
+      if (!animalForm.tagNumber || !animalForm.type || !animalForm.breed || !animalForm.gender || !animalForm.birthDate || !animalForm.weight) {
+        toast({ title: 'Validation Error', description: 'Please fill all required fields: Tag Number, Type, Breed, Gender, Birth Date, Weight', variant: 'destructive' });
+        return;
+      }
+
       const res = await fetch('/api/animals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(animalForm),
       });
+      
+      const data = await res.json();
+      
       if (res.ok) {
         toast({ title: 'Success', description: 'Animal added successfully' });
         setAddAnimalOpen(false);
         resetAnimalForm();
         fetchAnimals();
         fetchDashboard();
+      } else {
+        toast({ title: 'Error', description: data.error || data.details || 'Failed to add animal', variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to add animal', variant: 'destructive' });
+      console.error('Create animal error:', error);
+      toast({ title: 'Error', description: 'Network error - please check your connection', variant: 'destructive' });
     }
   };
 
