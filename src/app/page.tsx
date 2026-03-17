@@ -545,19 +545,32 @@ export default function LivestockFarmManagement() {
 
   const createBreedingRecord = async () => {
     try {
+      // Validate required fields
+      if (!breedingForm.maleId || !breedingForm.femaleId || !breedingForm.breedingDate) {
+        toast({ title: 'Validation Error', description: 'Please select both male and female animals, and breeding date', variant: 'destructive' });
+        return;
+      }
+
       const res = await fetch('/api/breeding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(breedingForm),
       });
+      
+      const data = await res.json();
+      
       if (res.ok) {
         toast({ title: 'Success', description: 'Breeding record added successfully' });
         setAddBreedingOpen(false);
         setBreedingForm({ maleId: '', femaleId: '', breedingDate: '', status: 'planned', notes: '' });
         fetchBreedingRecords();
+        fetchDashboard();
+      } else {
+        toast({ title: 'Error', description: data.error || data.details || 'Failed to add breeding record', variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to add breeding record', variant: 'destructive' });
+      console.error('Breeding record error:', error);
+      toast({ title: 'Error', description: 'Network error - please try again', variant: 'destructive' });
     }
   };
 
