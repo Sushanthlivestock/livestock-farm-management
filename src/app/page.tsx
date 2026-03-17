@@ -2042,20 +2042,9 @@ export default function LivestockFarmManagement() {
                             onClick={async () => {
                               setDownloading(true);
                               try {
-                                const response = await fetch('/api/reports?type=full');
-                                if (!response.ok) throw new Error('Failed to generate report');
-                                
-                                const blob = await response.blob();
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `farm_report_${new Date().toISOString().slice(0, 10)}.pdf`;
-                                document.body.appendChild(a);
-                                a.click();
-                                window.URL.revokeObjectURL(url);
-                                a.remove();
-                                
-                                toast({ title: 'Success', description: 'Report downloaded successfully!' });
+                                // Open report in new tab - it's HTML that can be printed to PDF
+                                window.open('/api/reports?type=full', '_blank');
+                                toast({ title: 'Success', description: 'Report opened in new tab. Use Print button to save as PDF.' });
                               } catch (error) {
                                 toast({ title: 'Error', description: 'Failed to generate report', variant: 'destructive' });
                               } finally {
