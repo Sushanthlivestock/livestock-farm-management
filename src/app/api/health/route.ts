@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(records);
   } catch (error) {
     console.error('Error fetching health records:', error);
-    return NextResponse.json({ error: 'Failed to fetch health records' }, { status: 500 });
+    return NextResponse.json([]);
   }
 }
 

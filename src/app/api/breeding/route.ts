@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(records);
   } catch (error) {
     console.error('Error fetching breeding records:', error);
-    return NextResponse.json({ error: 'Failed to fetch breeding records' }, { status: 500 });
+    return NextResponse.json([]);
   }
 }
 

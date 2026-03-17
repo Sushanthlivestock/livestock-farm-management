@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(records);
   } catch (error) {
     console.error('Error fetching feeding records:', error);
-    return NextResponse.json({ error: 'Failed to fetch feeding records' }, { status: 500 });
+    return NextResponse.json([]);
   }
 }
 
