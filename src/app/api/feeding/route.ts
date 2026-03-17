@@ -33,19 +33,27 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // If animalId is empty or not provided, set to null for general feeding record
+    const animalId = body.animalId && body.animalId.trim() !== '' ? body.animalId : null;
+    
     const record = await db.feedingRecord.create({
       data: {
-        animalId: body.animalId,
-        date: new Date(body.date),
+        animalId: animalId,
+        date: body.date ? new Date(body.date) : new Date(),
         feedType: body.feedType,
-        quantity: parseFloat(body.quantity),
-        notes: body.notes,
+        quantity: parseFloat(body.quantity) || 0,
+        notes: body.notes || null,
+      },
+      include: {
+        animal: {
+          select: { name: true, tagNumber: true, type: true },
+        },
       },
     });
 
     return NextResponse.json(record, { status: 201 });
   } catch (error) {
     console.error('Error creating feeding record:', error);
-    return NextResponse.json({ error: 'Failed to create feeding record' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create feeding record', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

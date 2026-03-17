@@ -109,8 +109,8 @@ model BreedingRecord {
 
 model FeedingRecord {
   id          String   @id @default(cuid())
-  animalId    String
-  animal      Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  animalId    String?
+  animal      Animal?  @relation(fields: [animalId], references: [id], onDelete: Cascade)
   date        DateTime @default(now())
   feedType    String
   quantity    Float    // in kg

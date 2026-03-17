@@ -21,7 +21,7 @@ import {
   Baby, Syringe, Utensils, Calendar, BarChart3, PieChart,
   Home, Users, Scale, AlertTriangle, CheckCircle, Clock,
   ChevronDown, Download, RefreshCw, Eye, FileText, Printer,
-  Bell, Mail, MessageSquare, Send, Settings
+  Bell, Mail, MessageSquare, Send, Settings, Palette, Moon, Sun, Save, RotateCcw
 } from 'lucide-react';
 import {
   ChartConfig,
@@ -134,6 +134,34 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+// Theme Settings Interface
+interface ThemeSettings {
+  farmName: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  darkMode: boolean;
+}
+
+// Default theme
+const DEFAULT_THEME: ThemeSettings = {
+  farmName: 'Integrated Livestock Farm',
+  primaryColor: '#059669',
+  secondaryColor: '#D97706',
+  accentColor: '#14B8A6',
+  darkMode: false,
+};
+
+// Predefined color presets
+const COLOR_PRESETS = [
+  { name: 'Emerald', primary: '#059669', secondary: '#D97706', accent: '#14B8A6' },
+  { name: 'Ocean Blue', primary: '#0284C7', secondary: '#F59E0B', accent: '#06B6D4' },
+  { name: 'Royal Purple', primary: '#7C3AED', secondary: '#EC4899', accent: '#8B5CF6' },
+  { name: 'Forest', primary: '#166534', secondary: '#CA8A04', accent: '#15803D' },
+  { name: 'Sunset', primary: '#EA580C', secondary: '#DC2626', accent: '#F59E0B' },
+  { name: 'Midnight', primary: '#1E40AF', secondary: '#7C3AED', accent: '#3B82F6' },
+];
+
 export default function LivestockFarmManagement() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -188,6 +216,38 @@ export default function LivestockFarmManagement() {
     notes: '',
   });
 
+  // Feeding & Financial states
+  const [feedingRecords, setFeedingRecords] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [incomeRecords, setIncomeRecords] = useState<any[]>([]);
+  const [addFeedingOpen, setAddFeedingOpen] = useState(false);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [addIncomeOpen, setAddIncomeOpen] = useState(false);
+
+  const [feedingForm, setFeedingForm] = useState({
+    animalId: 'none',
+    date: '',
+    feedType: '',
+    quantity: '',
+    notes: '',
+  });
+
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'feed',
+    description: '',
+    amount: '',
+    date: '',
+    notes: '',
+  });
+
+  const [incomeForm, setIncomeForm] = useState({
+    category: 'sale',
+    description: '',
+    amount: '',
+    date: '',
+    notes: '',
+  });
+
   // Download state
   const [downloading, setDownloading] = useState(false);
 
@@ -205,6 +265,10 @@ export default function LivestockFarmManagement() {
     telegramEnabled: true,
   });
   const [sendingNotif, setSendingNotif] = useState(false);
+
+  // Theme Settings State
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
+  const [tempTheme, setTempTheme] = useState<ThemeSettings>(DEFAULT_THEME);
 
   // Add email recipient
   const addEmailRecipient = () => {
@@ -282,10 +346,40 @@ export default function LivestockFarmManagement() {
     }
   };
 
+  const fetchFeedingRecords = async () => {
+    try {
+      const res = await fetch('/api/feeding');
+      const data = await res.json();
+      setFeedingRecords(data);
+    } catch (error) {
+      console.error('Error fetching feeding records:', error);
+    }
+  };
+
+  const fetchExpenses = async () => {
+    try {
+      const res = await fetch('/api/expenses');
+      const data = await res.json();
+      setExpenses(data);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+    }
+  };
+
+  const fetchIncome = async () => {
+    try {
+      const res = await fetch('/api/income');
+      const data = await res.json();
+      setIncomeRecords(data);
+    } catch (error) {
+      console.error('Error fetching income records:', error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchDashboard(), fetchAnimals(), fetchHealthRecords(), fetchBreedingRecords()]);
+      await Promise.all([fetchDashboard(), fetchAnimals(), fetchHealthRecords(), fetchBreedingRecords(), fetchFeedingRecords(), fetchExpenses(), fetchIncome()]);
       setLoading(false);
     };
     loadData();
@@ -308,6 +402,63 @@ export default function LivestockFarmManagement() {
     };
     loadAnimals();
   }, [filterType, filterStatus, searchTerm]);
+
+  // Load theme settings from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('farmThemeSettings');
+    if (savedTheme) {
+      try {
+        const parsed = JSON.parse(savedTheme);
+        setThemeSettings(parsed);
+        setTempTheme(parsed);
+      } catch (e) {
+        console.error('Failed to parse theme settings', e);
+      }
+    }
+  }, []);
+
+  // Apply theme to CSS variables
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--primary', themeSettings.primaryColor);
+    root.style.setProperty('--secondary', themeSettings.secondaryColor);
+    root.style.setProperty('--accent', themeSettings.accentColor);
+    root.style.setProperty('--farm-primary', themeSettings.primaryColor);
+    root.style.setProperty('--farm-secondary', themeSettings.secondaryColor);
+    root.style.setProperty('--farm-accent', themeSettings.accentColor);
+
+    // Apply dark mode class
+    if (themeSettings.darkMode) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [themeSettings]);
+
+  // Save theme settings
+  const saveThemeSettings = () => {
+    setThemeSettings(tempTheme);
+    localStorage.setItem('farmThemeSettings', JSON.stringify(tempTheme));
+    toast({ title: 'Theme Saved!', description: 'Your theme settings have been applied.' });
+  };
+
+  // Reset theme settings
+  const resetThemeSettings = () => {
+    setTempTheme(DEFAULT_THEME);
+    setThemeSettings(DEFAULT_THEME);
+    localStorage.setItem('farmThemeSettings', JSON.stringify(DEFAULT_THEME));
+    toast({ title: 'Theme Reset', description: 'Theme has been reset to default.' });
+  };
+
+  // Apply preset theme
+  const applyPreset = (preset: typeof COLOR_PRESETS[0]) => {
+    setTempTheme({
+      ...tempTheme,
+      primaryColor: preset.primary,
+      secondaryColor: preset.secondary,
+      accentColor: preset.accent,
+    });
+  };
 
   // CRUD Operations
   const createAnimal = async () => {
@@ -395,6 +546,77 @@ export default function LivestockFarmManagement() {
       }
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to add breeding record', variant: 'destructive' });
+    }
+  };
+
+  const createFeedingRecord = async () => {
+    try {
+      // Convert 'none' to empty string for API
+      const formData = {
+        ...feedingForm,
+        animalId: feedingForm.animalId === 'none' ? '' : feedingForm.animalId,
+      };
+      const res = await fetch('/api/feeding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Feeding record added successfully' });
+        setAddFeedingOpen(false);
+        setFeedingForm({ animalId: 'none', date: '', feedType: '', quantity: '', notes: '' });
+        fetchFeedingRecords();
+        fetchDashboard();
+      } else {
+        const errorData = await res.json();
+        toast({ title: 'Error', description: errorData.error || 'Failed to add feeding record', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add feeding record', variant: 'destructive' });
+    }
+  };
+
+  const createExpense = async () => {
+    try {
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expenseForm),
+      });
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Expense added successfully' });
+        setAddExpenseOpen(false);
+        setExpenseForm({ category: 'feed', description: '', amount: '', date: '', notes: '' });
+        fetchExpenses();
+        fetchDashboard();
+      } else {
+        const errorData = await res.json();
+        toast({ title: 'Error', description: errorData.error || 'Failed to add expense', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add expense', variant: 'destructive' });
+    }
+  };
+
+  const createIncome = async () => {
+    try {
+      const res = await fetch('/api/income', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(incomeForm),
+      });
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Income added successfully' });
+        setAddIncomeOpen(false);
+        setIncomeForm({ category: 'sale', description: '', amount: '', date: '', notes: '' });
+        fetchIncome();
+        fetchDashboard();
+      } else {
+        const errorData = await res.json();
+        toast({ title: 'Error', description: errorData.error || 'Failed to add income', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add income', variant: 'destructive' });
     }
   };
 
@@ -509,9 +731,18 @@ export default function LivestockFarmManagement() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 25%, #fefce8 50%, #f0fdfa 75%, #f0fdf4 100%)' }}>
+    <div className="min-h-screen" style={{ 
+      background: themeSettings.darkMode 
+        ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' 
+        : `linear-gradient(135deg, ${themeSettings.primaryColor}10 0%, ${themeSettings.secondaryColor}10 50%, ${themeSettings.accentColor}10 100%)`
+    }}>
       {/* Header */}
-      <header className="header-modern text-white shadow-2xl sticky top-0 z-50">
+      <header 
+        className="text-white shadow-2xl sticky top-0 z-50"
+        style={{ 
+          background: `linear-gradient(135deg, ${themeSettings.primaryColor} 0%, ${themeSettings.accentColor} 100%)` 
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4 py-4 relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 animate-fade-in">
@@ -522,7 +753,7 @@ export default function LivestockFarmManagement() {
                 </div>
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Integrated Livestock Farm</h1>
+                <h1 className="text-2xl font-bold tracking-tight">{themeSettings.farmName}</h1>
                 <p className="text-emerald-100 text-sm font-medium">Goat & Pig Management System</p>
               </div>
             </div>
@@ -554,7 +785,7 @@ export default function LivestockFarmManagement() {
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="tabs-modern grid grid-cols-2 md:grid-cols-8 gap-2">
+          <TabsList className="tabs-modern grid grid-cols-3 md:grid-cols-9 gap-2">
             <TabsTrigger value="dashboard" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-500/30">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -586,6 +817,10 @@ export default function LivestockFarmManagement() {
             <TabsTrigger value="notifications" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-cyan-500/30">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Alerts</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-500 data-[state=active]:to-gray-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-slate-500/30">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Settings</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1369,89 +1604,125 @@ export default function LivestockFarmManagement() {
           <TabsContent value="feeding" className="space-y-4 animate-fade-in-up">
             <Card className="card-modern">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg">
-                    <Utensils className="h-5 w-5 text-white" />
-                  </div>
-                  Feeding Overview
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg">
+                      <Utensils className="h-5 w-5 text-white" />
+                    </div>
+                    Feeding Records
+                  </CardTitle>
+                  <Dialog open={addFeedingOpen} onOpenChange={setAddFeedingOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="btn-modern bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Feeding Record
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="dialog-modern">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">Add Feeding Record</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Animal (Optional - leave empty for all)</Label>
+                          <Select value={feedingForm.animalId} onValueChange={(v) => setFeedingForm({ ...feedingForm, animalId: v })}>
+                            <SelectTrigger><SelectValue placeholder="Select animal or leave empty" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">All Animals (General)</SelectItem>
+                              {animals.map((a) => (
+                                <SelectItem key={a.id} value={a.id}>{a.tagNumber} - {a.name || 'Unnamed'}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Date *</Label>
+                            <Input type="date" value={feedingForm.date} onChange={(e) => setFeedingForm({ ...feedingForm, date: e.target.value })} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Feed Type *</Label>
+                            <Select value={feedingForm.feedType} onValueChange={(v) => setFeedingForm({ ...feedingForm, feedType: v })}>
+                              <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="hay">Hay</SelectItem>
+                                <SelectItem value="grass">Fresh Grass</SelectItem>
+                                <SelectItem value="grain">Grain Mix</SelectItem>
+                                <SelectItem value="alfalfa">Alfalfa</SelectItem>
+                                <SelectItem value="minerals">Mineral Blocks</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Quantity (kg) *</Label>
+                          <Input type="number" value={feedingForm.quantity} onChange={(e) => setFeedingForm({ ...feedingForm, quantity: e.target.value })} placeholder="Enter quantity" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Input value={feedingForm.notes} onChange={(e) => setFeedingForm({ ...feedingForm, notes: e.target.value })} placeholder="Additional notes" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddFeedingOpen(false)}>Cancel</Button>
+                        <Button className="bg-amber-500 hover:bg-amber-600" onClick={createFeedingRecord}>Add Record</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg text-gray-800">Daily Feeding Schedule</h3>
-                    <div className="space-y-3">
-                      <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-100 rounded-xl border-l-4 border-emerald-500 hover:shadow-lg transition-shadow cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
-                          <p className="font-semibold text-emerald-800">Morning Feeding</p>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2 ml-10">6:00 AM - Fresh grass and hay</p>
-                      </div>
-                      <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-100 rounded-xl border-l-4 border-amber-500 hover:shadow-lg transition-shadow cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
-                          <p className="font-semibold text-amber-800">Afternoon Feeding</p>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2 ml-10">12:00 PM - Grain mix supplement</p>
-                      </div>
-                      <div className="p-4 bg-gradient-to-r from-sky-50 to-blue-100 rounded-xl border-l-4 border-blue-500 hover:shadow-lg transition-shadow cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
-                          <p className="font-semibold text-blue-800">Evening Feeding</p>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2 ml-10">6:00 PM - Hay and mineral blocks</p>
-                      </div>
+                <ScrollArea className="h-[400px] scroll-area-modern">
+                  {feedingRecords.length > 0 ? (
+                    <div className="rounded-xl overflow-hidden border border-gray-200">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
+                            <TableHead className="text-white font-semibold">Date</TableHead>
+                            <TableHead className="text-white font-semibold">Animal</TableHead>
+                            <TableHead className="text-white font-semibold">Feed Type</TableHead>
+                            <TableHead className="text-white font-semibold">Quantity</TableHead>
+                            <TableHead className="text-white font-semibold">Notes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {feedingRecords.map((record, index) => (
+                            <TableRow key={record.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'} hover:bg-amber-50/50 transition-colors`}>
+                              <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
+                              <TableCell>
+                                {record.animal ? (
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline">{record.animal.tagNumber}</Badge>
+                                    <span>{record.animal.name || '-'}</span>
+                                  </div>
+                                ) : (
+                                  <Badge className="badge-amber">All Animals</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="capitalize">{record.feedType}</TableCell>
+                              <TableCell className="font-medium">{record.quantity} kg</TableCell>
+                              <TableCell className="text-gray-600">{record.notes || '-'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                  </div>
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg text-gray-800">Feed Inventory</h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                            <Utensils className="h-5 w-5 text-emerald-600" />
-                          </div>
-                          <span className="font-medium">Grass Hay</span>
-                        </div>
-                        <Badge className="badge-modern badge-emerald">500 kg</Badge>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                            <Utensils className="h-5 w-5 text-green-600" />
-                          </div>
-                          <span className="font-medium">Alfalfa</span>
-                        </div>
-                        <Badge className="badge-modern badge-teal">300 kg</Badge>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                            <Utensils className="h-5 w-5 text-amber-600" />
-                          </div>
-                          <span className="font-medium">Grain Mix</span>
-                        </div>
-                        <Badge className="badge-modern badge-amber">200 kg</Badge>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
-                            <Utensils className="h-5 w-5 text-violet-600" />
-                          </div>
-                          <span className="font-medium">Mineral Blocks</span>
-                        </div>
-                        <Badge className="badge-modern badge-indigo">50 units</Badge>
-                      </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                      <Utensils className="h-16 w-16 mb-4 opacity-30" />
+                      <p className="text-lg font-medium">No feeding records yet</p>
+                      <p className="text-sm">Click "Add Feeding Record" to get started</p>
                     </div>
-                  </div>
-                </div>
+                  )}
+                </ScrollArea>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Financial Tab */}
           <TabsContent value="financial" className="space-y-4 animate-fade-in-up">
+            {/* Summary Cards */}
             <div className="grid md:grid-cols-3 gap-4">
               <div className="stat-card stat-card-emerald animate-fade-in delay-100 hover-lift cursor-pointer">
                 <div className="relative z-10">
@@ -1494,61 +1765,201 @@ export default function LivestockFarmManagement() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <Card className="chart-container-modern hover-lift">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+            {/* Expenses Section */}
+            <Card className="card-modern">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
                     <div className="p-2 bg-gradient-to-r from-rose-500 to-red-500 rounded-lg">
                       <TrendingDown className="h-5 w-5 text-white" />
                     </div>
-                    Expenses by Category
+                    Expenses
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ChartContainer config={chartConfig} className="h-[250px]">
-                    <BarChart data={financialData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="amount" fill="url(#expenseGradient)" radius={[8, 8, 0, 0]} />
-                      <defs>
-                        <linearGradient id="expenseGradient" x1="0" y1="1" x2="0" y2="0">
-                          <stop offset="0%" stopColor="#ef4444" />
-                          <stop offset="100%" stopColor="#f87171" />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ChartContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="chart-container-modern hover-lift">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-white" />
-                    </div>
-                    Expense Breakdown
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[250px] scroll-area-modern">
-                    <div className="space-y-3">
-                      {dashboardData?.financial.expensesByCategory.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl hover:shadow-md transition-shadow">
-                          <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                            <span className="capitalize font-medium text-gray-700">{item.category}</span>
+                  <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="btn-modern bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Expense
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="dialog-modern">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-bold bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">Add Expense</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Category *</Label>
+                            <Select value={expenseForm.category} onValueChange={(v) => setExpenseForm({ ...expenseForm, category: v })}>
+                              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="feed">Feed</SelectItem>
+                                <SelectItem value="veterinary">Veterinary</SelectItem>
+                                <SelectItem value="equipment">Equipment</SelectItem>
+                                <SelectItem value="labor">Labor</SelectItem>
+                                <SelectItem value="utilities">Utilities</SelectItem>
+                                <SelectItem value="maintenance">Maintenance</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <span className="font-bold text-emerald-600">{formatCurrency(item._sum.amount)}</span>
+                          <div className="space-y-2">
+                            <Label>Amount (₹) *</Label>
+                            <Input type="number" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="Enter amount" />
+                          </div>
                         </div>
-                      ))}
+                        <div className="space-y-2">
+                          <Label>Description *</Label>
+                          <Input value={expenseForm.description} onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="Enter description" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Date *</Label>
+                          <Input type="date" value={expenseForm.date} onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Input value={expenseForm.notes} onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })} placeholder="Additional notes" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddExpenseOpen(false)}>Cancel</Button>
+                        <Button className="bg-rose-500 hover:bg-rose-600" onClick={createExpense}>Add Expense</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[200px] scroll-area-modern">
+                  {expenses.length > 0 ? (
+                    <div className="rounded-xl overflow-hidden border border-gray-200">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gradient-to-r from-rose-500 to-red-500">
+                            <TableHead className="text-white font-semibold">Date</TableHead>
+                            <TableHead className="text-white font-semibold">Category</TableHead>
+                            <TableHead className="text-white font-semibold">Description</TableHead>
+                            <TableHead className="text-white font-semibold text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {expenses.slice(0, 10).map((expense, index) => (
+                            <TableRow key={expense.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-rose-50/30'} hover:bg-rose-50/50 transition-colors`}>
+                              <TableCell className="font-medium">{formatDate(expense.date)}</TableCell>
+                              <TableCell className="capitalize">{expense.category}</TableCell>
+                              <TableCell className="text-gray-600">{expense.description}</TableCell>
+                              <TableCell className="text-right font-bold text-rose-600">{formatCurrency(expense.amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                      <TrendingDown className="h-12 w-12 mb-2 opacity-30" />
+                      <p>No expenses recorded yet</p>
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Income Section */}
+            <Card className="card-modern">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-white" />
+                    </div>
+                    Income
+                  </CardTitle>
+                  <Dialog open={addIncomeOpen} onOpenChange={setAddIncomeOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="btn-modern btn-gradient-emerald">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Income
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="dialog-modern">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Add Income</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Category *</Label>
+                            <Select value={incomeForm.category} onValueChange={(v) => setIncomeForm({ ...incomeForm, category: v })}>
+                              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="sale">Animal Sale</SelectItem>
+                                <SelectItem value="milk">Milk Sale</SelectItem>
+                                <SelectItem value="meat">Meat Sale</SelectItem>
+                                <SelectItem value="breeding">Breeding Services</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Amount (₹) *</Label>
+                            <Input type="number" value={incomeForm.amount} onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })} placeholder="Enter amount" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description *</Label>
+                          <Input value={incomeForm.description} onChange={(e) => setIncomeForm({ ...incomeForm, description: e.target.value })} placeholder="Enter description" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Date *</Label>
+                          <Input type="date" value={incomeForm.date} onChange={(e) => setIncomeForm({ ...incomeForm, date: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Notes</Label>
+                          <Input value={incomeForm.notes} onChange={(e) => setIncomeForm({ ...incomeForm, notes: e.target.value })} placeholder="Additional notes" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddIncomeOpen(false)}>Cancel</Button>
+                        <Button className="btn-gradient-emerald" onClick={createIncome}>Add Income</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[200px] scroll-area-modern">
+                  {incomeRecords.length > 0 ? (
+                    <div className="rounded-xl overflow-hidden border border-gray-200">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gradient-to-r from-emerald-500 to-teal-500">
+                            <TableHead className="text-white font-semibold">Date</TableHead>
+                            <TableHead className="text-white font-semibold">Category</TableHead>
+                            <TableHead className="text-white font-semibold">Description</TableHead>
+                            <TableHead className="text-white font-semibold text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {incomeRecords.slice(0, 10).map((income, index) => (
+                            <TableRow key={income.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30'} hover:bg-emerald-50/50 transition-colors`}>
+                              <TableCell className="font-medium">{formatDate(income.date)}</TableCell>
+                              <TableCell className="capitalize">{income.category}</TableCell>
+                              <TableCell className="text-gray-600">{income.description}</TableCell>
+                              <TableCell className="text-right font-bold text-emerald-600">{formatCurrency(income.amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                      <TrendingUp className="h-12 w-12 mb-2 opacity-30" />
+                      <p>No income recorded yet</p>
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Reports Tab */}
@@ -2082,6 +2493,259 @@ export default function LivestockFarmManagement() {
               </div>
             </div>
           </TabsContent>
+
+          {/* Settings Tab - Theme Customizer */}
+          <TabsContent value="settings" className="space-y-6 animate-fade-in-up">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Farm Identity */}
+              <Card className="card-modern hover-lift">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-slate-500 to-gray-600 rounded-lg">
+                      <Home className="h-5 w-5 text-white" />
+                    </div>
+                    Farm Identity
+                  </CardTitle>
+                  <CardDescription>Customize your farm name and branding</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Farm Name</Label>
+                    <Input
+                      value={tempTheme.farmName}
+                      onChange={(e) => setTempTheme({ ...tempTheme, farmName: e.target.value })}
+                      placeholder="Enter your farm name"
+                      className="input-modern"
+                    />
+                    <p className="text-xs text-gray-500">This name will appear in the header</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Color Theme */}
+              <Card className="card-modern hover-lift">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg">
+                      <Palette className="h-5 w-5 text-white" />
+                    </div>
+                    Color Theme
+                  </CardTitle>
+                  <CardDescription>Choose your favorite color scheme</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">Color Presets</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {COLOR_PRESETS.map((preset) => (
+                        <button
+                          key={preset.name}
+                          onClick={() => applyPreset(preset)}
+                          className={`p-2 rounded-lg border-2 transition-all hover:scale-105 ${
+                            tempTheme.primaryColor === preset.primary
+                              ? 'border-gray-800 shadow-lg'
+                              : 'border-gray-200'
+                          }`}
+                        >
+                          <div className="flex gap-1 mb-1 justify-center">
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: preset.primary }} />
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: preset.secondary }} />
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: preset.accent }} />
+                          </div>
+                          <span className="text-xs font-medium">{preset.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Custom Colors */}
+              <Card className="card-modern hover-lift">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg">
+                      <Palette className="h-5 w-5 text-white" />
+                    </div>
+                    Custom Colors
+                  </CardTitle>
+                  <CardDescription>Fine-tune individual colors</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Primary</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={tempTheme.primaryColor}
+                          onChange={(e) => setTempTheme({ ...tempTheme, primaryColor: e.target.value })}
+                          className="w-10 h-10 rounded-lg border-2 border-gray-200 cursor-pointer"
+                        />
+                        <Input
+                          value={tempTheme.primaryColor}
+                          onChange={(e) => setTempTheme({ ...tempTheme, primaryColor: e.target.value })}
+                          className="w-24 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Secondary</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={tempTheme.secondaryColor}
+                          onChange={(e) => setTempTheme({ ...tempTheme, secondaryColor: e.target.value })}
+                          className="w-10 h-10 rounded-lg border-2 border-gray-200 cursor-pointer"
+                        />
+                        <Input
+                          value={tempTheme.secondaryColor}
+                          onChange={(e) => setTempTheme({ ...tempTheme, secondaryColor: e.target.value })}
+                          className="w-24 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Accent</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={tempTheme.accentColor}
+                          onChange={(e) => setTempTheme({ ...tempTheme, accentColor: e.target.value })}
+                          className="w-10 h-10 rounded-lg border-2 border-gray-200 cursor-pointer"
+                        />
+                        <Input
+                          value={tempTheme.accentColor}
+                          onChange={(e) => setTempTheme({ ...tempTheme, accentColor: e.target.value })}
+                          className="w-24 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Display Mode */}
+              <Card className="card-modern hover-lift">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 bg-gradient-to-r from-gray-600 to-gray-800 rounded-lg">
+                      {tempTheme.darkMode ? <Moon className="h-5 w-5 text-white" /> : <Sun className="h-5 w-5 text-white" />}
+                    </div>
+                    Display Mode
+                  </CardTitle>
+                  <CardDescription>Toggle between light and dark mode</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      {tempTheme.darkMode ? <Moon className="h-6 w-6 text-indigo-600" /> : <Sun className="h-6 w-6 text-amber-500" />}
+                      <div>
+                        <p className="font-semibold">{tempTheme.darkMode ? 'Dark Mode' : 'Light Mode'}</p>
+                        <p className="text-sm text-gray-500">
+                          {tempTheme.darkMode ? 'Easier on eyes at night' : 'Bright and clean look'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setTempTheme({ ...tempTheme, darkMode: !tempTheme.darkMode })}
+                      className={`relative w-14 h-7 rounded-full transition-colors ${
+                        tempTheme.darkMode ? 'bg-indigo-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          tempTheme.darkMode ? 'translate-x-8' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Preview Section */}
+            <Card className="card-modern">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
+                    <Eye className="h-5 w-5 text-white" />
+                  </div>
+                  Live Preview
+                </CardTitle>
+                <CardDescription>See how your theme will look</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div
+                  className="p-6 rounded-xl"
+                  style={{
+                    background: `linear-gradient(135deg, ${tempTheme.primaryColor}20, ${tempTheme.secondaryColor}20)`,
+                    borderColor: tempTheme.primaryColor,
+                    borderWidth: 2,
+                  }}
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: tempTheme.primaryColor }}
+                    >
+                      <Home className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">{tempTheme.farmName}</h3>
+                      <p className="text-gray-500 text-sm">Preview of your farm header</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      className="px-4 py-2 rounded-lg text-white font-medium"
+                      style={{ backgroundColor: tempTheme.primaryColor }}
+                    >
+                      Primary Button
+                    </button>
+                    <button
+                      className="px-4 py-2 rounded-lg text-white font-medium"
+                      style={{ backgroundColor: tempTheme.secondaryColor }}
+                    >
+                      Secondary Button
+                    </button>
+                    <button
+                      className="px-4 py-2 rounded-lg text-white font-medium"
+                      style={{ backgroundColor: tempTheme.accentColor }}
+                    >
+                      Accent Button
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Button
+                onClick={saveThemeSettings}
+                className="btn-gradient-emerald px-8 py-6 text-lg"
+              >
+                <Save className="h-5 w-5 mr-2" />
+                Save Theme Settings
+              </Button>
+              <Button
+                onClick={resetThemeSettings}
+                variant="outline"
+                className="px-8 py-6 text-lg border-2"
+              >
+                <RotateCcw className="h-5 w-5 mr-2" />
+                Reset to Default
+              </Button>
+            </div>
+
+            {/* Info Box */}
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Tip:</strong> Your theme settings are saved in your browser and will persist when you visit again. Changes apply immediately after saving.
+              </p>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -2226,7 +2890,7 @@ export default function LivestockFarmManagement() {
       {/* Footer */}
       <footer className="bg-gray-800 text-white py-4 mt-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-sm">Integrated Livestock Farm Management System | 105 Goats | 50 Pigs</p>
+          <p className="text-sm">{themeSettings.farmName} Management System | {dashboardData?.overview.totalGoats || 105} Goats | {dashboardData?.overview.totalPigs || 50} Pigs</p>
         </div>
       </footer>
     </div>
