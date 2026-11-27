@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 // GET all breeding records
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -32,6 +36,9 @@ export async function GET(request: NextRequest) {
 
 // POST create breeding record
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     

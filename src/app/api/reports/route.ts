@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // GET - Generate and return PDF report
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const reportType = searchParams.get('type') || 'full';

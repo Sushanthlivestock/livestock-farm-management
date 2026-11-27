@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 
 const NOTIFICATION_SERVICE_URL = 'http://localhost:3002';
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { type, title, message, data } = body;

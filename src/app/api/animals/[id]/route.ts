@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { LIMITS, checkDate, checkNumber, firstError } from '@/lib/validate';
 import { db } from '@/lib/db';
 
 // GET single animal by ID
@@ -6,6 +8,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     
@@ -48,9 +53,19 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     const body = await request.json();
+    const invalid = firstError(
+      checkNumber(body.weight, 'Weight (kg)', 0.1, LIMITS.maxWeightKg),
+      checkNumber(body.purchasePrice, 'Purchase price', 0, LIMITS.maxAmount),
+      checkDate(body.birthDate, 'Birth date'),
+      checkDate(body.purchaseDate, 'Purchase date'),
+    );
+    if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
     
     const updateData: any = {};
     
@@ -85,6 +100,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     
