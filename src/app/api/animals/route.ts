@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { LIMITS, checkDate, checkNumber, firstError } from '@/lib/validate';
 import { db } from '@/lib/db';
 
 // GET all animals with filtering
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
@@ -43,8 +48,18 @@ export async function GET(request: NextRequest) {
 
 // POST create new animal
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
+    const invalid = firstError(
+      checkNumber(body.weight, 'Weight (kg)', 0.1, LIMITS.maxWeightKg),
+      checkNumber(body.purchasePrice, 'Purchase price', 0, LIMITS.maxAmount),
+      checkDate(body.birthDate, 'Birth date'),
+      checkDate(body.purchaseDate, 'Purchase date'),
+    );
+    if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
     
     console.log('=== Creating Animal ===');
     console.log('Received data:', JSON.stringify(body, null, 2));
